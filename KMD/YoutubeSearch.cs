@@ -11,16 +11,18 @@ namespace KMD
         {
             if (string.IsNullOrWhiteSpace(search_term))
             {
-                throw new ArgumentException("message", nameof(search_term));
+                throw new ArgumentException("No Search Term Provided", nameof(search_term));
             }
 
+            HtmlDocument document = new HtmlDocument();
+
             Variables.current_titles.Clear();
+            Variables.current_uploaders.Clear();
             Variables.current_hrefs.Clear();
 
             Variables.current_titles.Add("Skip");
-            Variables.current_hrefs.Add("Skip");
-
-            HtmlDocument document = new HtmlDocument();
+            Variables.current_uploaders.Add("None");
+            Variables.current_hrefs.Add("None");
 
             string search_url = "https://www.youtube.com/results?search_query=" + search_term
                                     .Replace("!", "%21").Replace("\"", "%22")
@@ -39,42 +41,83 @@ namespace KMD
             // MAKE SURE TO REMOVE THIS
             Process.Start("C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe", search_url);
 
-            try
+            using (WebClient client = new WebClient())
             {
-                using (WebClient client = new WebClient())
+                client.Headers[HttpRequestHeader.UserAgent] = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.2 (KHTML, like Gecko) Chrome/15.0.874.121 Safari/535.2";
+
+                string html = client.DownloadString(search_url);
+
+                document.LoadHtml(html);
+
+                foreach (HtmlNode current_node in document.DocumentNode.SelectNodes("//ytd-video-renderer/div/div/div/div/h3/a"))
                 {
-                    client.Headers.Add(HttpRequestHeader.UserAgent, "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36");
+                    string video_href = current_node.GetAttributeValue("href", null).Replace("/watch?v=", "");
+                    string video_title = current_node.GetAttributeValue("title", null);
 
-                    string html = client.DownloadString(search_url);
-
-                    document.LoadHtml(html);
-
-                    foreach (HtmlNode current_node in document.DocumentNode.SelectNodes("//h3/a"))
+                    try
                     {
-                        try
-                        {
-                            string video_title = current_node.GetAttributeValue("title", null);
-                            string video_href = current_node.GetAttributeValue("href", null);
+                        Variables.current_hrefs.Add(video_href);
+                    }
+                    catch { }
+                    finally
+                    {
+                        Variables.current_hrefs.Add("None");
+                    }
 
-                            if (video_title != null)
-                            {
-                                Variables.current_titles.Add(video_title);
-                            }
-                            if (video_href != null)
-                            {
-                                Variables.current_hrefs.Add(video_href);
-                            }
-                        }
-                        catch (Exception e)
-                        {
-                            Console.WriteLine(e);
-                        }
+                    try
+                    {
+                        Variables.current_titles.Add(video_title);
+                    }
+                    catch { }
+                    finally
+                    {
+                        Variables.current_hrefs.Add("None");
                     }
                 }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
+
+                foreach (HtmlNode current_node in document.DocumentNode.SelectNodes("//ytd-video-meta-block/div/div/div/yt-formatted-string"))
+                {
+                    string video_uploader = current_node.GetAttributeValue("title", null);
+
+                    try
+                    {
+                        Variables.current_uploaders.Add(video_uploader);
+                    }
+                    catch { }
+                    finally
+                    {
+                        Variables.current_hrefs.Add("None");
+                    }
+                }
+
+                /*
+                foreach (string href in Variables.current_hrefs)
+                {
+                    Console.WriteLine(href);
+                }
+
+                Console.ReadKey();
+
+                Console.Clear();
+
+                foreach (string title in Variables.current_titles)
+                {
+                    Console.WriteLine(title);
+                }
+
+                Console.ReadKey();
+
+                Console.Clear();
+
+                foreach (string uploader in Variables.current_uploaders)
+                {
+                    Console.WriteLine(uploader);
+                }
+
+                Console.ReadKey();
+
+                Console.Clear();
+                */
             }
         }
     }
